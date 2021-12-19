@@ -131,6 +131,8 @@ public class STPGRewardsSimple extends MDPRewardsSimple implements STPGRewards
 
 	// Accessors
 
+
+
 	@Override
 	public double getNestedTransitionReward(int s, int i, int j)
 	{

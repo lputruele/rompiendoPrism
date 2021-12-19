@@ -190,6 +190,15 @@ public class STPGExplicit extends MDPSimple implements STPG
 
 	// Accessors (for STPG)
 
+	// LP: added accessor for state owners
+	public List<Integer> getStateOwners(){
+		return stateOwners;
+	}
+	// LP: added accessor for transitions
+	public List<List<Distribution>> getTrans(){
+		return trans;
+	}
+
 	@Override
 	public int getPlayer(int s)
 	{
@@ -475,9 +484,36 @@ public class STPGExplicit extends MDPSimple implements STPG
 		}
 	}
 
-	/*
-	LUCIANO: ACA HAY QUE METER MANO ME PARECE
-	*/
+	// LP : Modified method to give upper Bound as sol if new sol exceeds this value
+	@Override
+	public void mvMultRewMinMaxMod(double vect[], STPGRewards rewards, boolean min1, boolean min2, double result[], BitSet subset, boolean complement, int adv[],
+			double disc)
+	{
+		int s;
+		boolean min = false;
+		MDPRewards mdpRewards = rewards.buildMDPRewards();
+		// Loop depends on subset/complement arguments
+		if (subset == null) {
+			for (s = 0; s < numStates; s++) {
+				min = (getPlayer(s) == 1) ? min1 : min2;
+				result[s] = mvMultRewMinMaxSingle(s, vect, mdpRewards, min, adv, disc);
+			}
+		} else if (complement) {
+			for (s = subset.nextClearBit(0); s < numStates; s = subset.nextClearBit(s + 1)) {
+				min = (getPlayer(s) == 1) ? min1 : min2;
+				result[s] = mvMultRewMinMaxSingle(s, vect, mdpRewards, min, adv, disc);
+			}
+		} else {
+			for (s = subset.nextSetBit(0); s >= 0; s = subset.nextSetBit(s + 1)) {
+				min = (getPlayer(s) == 1) ? min1 : min2;
+				//System.out.printf("s: %s, min1: %s, min2: %s, min: %s, player: %d\n", s, min1, min2, min, getPlayer(s));
+				double tmp = mvMultRewMinMaxSingle(s, vect, mdpRewards, min, adv, disc);
+				result[s] = tmp > STPGModelChecker.upperBound ? STPGModelChecker.upperBound : tmp;
+				//result[s] = mvMultRewMinMaxSingle(s, vect, mdpRewards, min, adv, disc);
+			}
+		}
+	}
+
 	@Override
 	public void mvMultRewMinMax(double vect[], STPGRewards rewards, boolean min1, boolean min2, double result[], BitSet subset, boolean complement, int adv[],
 			double disc)

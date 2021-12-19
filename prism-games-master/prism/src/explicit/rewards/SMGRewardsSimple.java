@@ -29,6 +29,7 @@ package explicit.rewards;
 
 import explicit.Model;
 import explicit.Product;
+import java.util.List;
 
 /**
  * Simple explicit-state storage of rewards for an SMG.
@@ -86,5 +87,10 @@ public class SMGRewardsSimple extends MDPRewardsSimple implements SMGRewards
 	public MDPRewards buildMDPRewards()
 	{
 		return new MDPRewardsSimple(this);
+	}
+
+	// LP: added accessor for state owners
+	public List<Double> getStateRewards(){
+		return stateRewards;
 	}
 }

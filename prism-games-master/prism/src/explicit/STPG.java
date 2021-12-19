@@ -290,6 +290,9 @@ public interface STPG extends NondetModel
 	 */
 	void mvMultRewMinMax(double[] vect, STPGRewards rewards, boolean min1, boolean min2, double[] result, BitSet subset, boolean complement, int[] adv,
 			double disc);
+	// LP: added modified method
+	void mvMultRewMinMaxMod(double[] vect, STPGRewards rewards, boolean min1, boolean min2, double[] result, BitSet subset, boolean complement, int[] adv,
+			double disc);
 
 	/**
 	 * Determine which choices result in min/max after a single row of matrix-vector multiplication and sum of action reward.
