@@ -960,6 +960,10 @@ public class STPGModelChecker extends ProbModelChecker
 	public ModelCheckerResult computeReachRewards(STPG stpg, STPGRewards rewards, BitSet target, boolean min1, boolean min2, double init[], BitSet known,
 			int unreachingSemantics) throws PrismException
 	{
+		boolean suf = false;
+		STPGExplicit stpge = (STPGExplicit) stpg;
+		suf = stpge.stoppingUnderFairness(target);
+		mainLog.println("STOPPING UNDER FAIRNESS?: "+ suf);
 		switch (unreachingSemantics) {
 		case R_INFINITY:
 			return computeReachRewardsInfinity(stpg, rewards, target, min1, min2, init, known);
@@ -996,8 +1000,10 @@ public class STPGModelChecker extends ProbModelChecker
 		boolean genAdv, done;
 		long timer;
 		// LP: Calculate Upper Bound
-		upperBound = computeUpperBound((STPGExplicit)stpg, (SMGRewardsSimple)rewards, min1, min2);
-		mainLog.println("Upper Bound: "+ upperBound);
+		init = computeUpperBound((STPGExplicit)stpg, (SMGRewardsSimple) rewards);
+		mainLog.println("Upper Bound: ");
+		for (i=0;i<init.length;i++)
+			mainLog.println(init[i]);
 		// Are we generating an optimal adversary?
 		genAdv = exportAdv || generateStrategy;
 
@@ -1027,7 +1033,7 @@ public class STPGModelChecker extends ProbModelChecker
 			}
 		} else {*/
 			for (i = 0; i < n; i++)
-				soln[i] = soln2[i] = target.get(i) ? 0.0 : upperBound;
+				soln[i] = soln2[i] = target.get(i) ? 0.0 : init[i];
 				//soln[i] = soln2[i] = target.get(i) ? 0.0 : inf.get(i) ? Double.POSITIVE_INFINITY : 0.0;
 		//}
 
@@ -1068,7 +1074,8 @@ public class STPGModelChecker extends ProbModelChecker
 		done = false;
 		while (!done && iters < maxIters) {
 			
-			//if (iters%500==0) mainLog.println(soln);
+			//if (iters%500==0) 
+				//mainLog.println(soln);
 			//mainLog.println(rewards);
 			//mainLog.println(min1);
 			//mainLog.println(min2);
@@ -1087,8 +1094,8 @@ public class STPGModelChecker extends ProbModelChecker
 			// PC: we avoid overflow with these lines
 			
 			for (i=0;i<n;i++){
-				if (soln2[i] > upperBound){
-					soln2[i] = Double.min(soln2[i], upperBound);
+				if (soln2[i] > init[i]){ // LP: why is this conditional necessary?
+					soln2[i] = Double.min(soln2[i], init[i]);
 					done = false; // PC: we need to avoid worng stopping since this modification
 				}
 			}
@@ -1428,6 +1435,10 @@ public class STPGModelChecker extends ProbModelChecker
 			// next part
 			// in which "proper" zero rewards are used
 			init = res.soln;
+			mainLog.println("Upper bound: ");
+			for (int i = 0; i < n; i++) {
+				mainLog.println(init[i]);
+			}
 
 			// Return the rewards to the original state
 			if (rewards instanceof MDPRewardsSimple) {
@@ -1679,12 +1690,11 @@ public class STPGModelChecker extends ProbModelChecker
 	* Compute upperBound for initial GFP value Iteration solution
 	* LP : This methods implements Baier's upper bound computation
 	*/
-	private double computeUpperBound(STPGExplicit stpg, SMGRewardsSimple rew, boolean min1, boolean min2) throws PrismException{
-		double res = 0;
+	private double[] computeUpperBound(STPGExplicit stpg, SMGRewardsSimple rew) throws PrismException{
 		// Transform stpg into simple mdp
 		LinkedList<List<Distribution>> originalTrans = new LinkedList<List<Distribution>>();
 		for (int i = 0; i < stpg.getNumStates(); i++){
-			if (stpg.stateOwners.get(i) == 1 && min1 || stpg.stateOwners.get(i) == 2 && min2){ // replace minimizer actions for a unique distribution
+			if (stpg.stateOwners.get(i) == 2){ // replace minimizer actions for a unique distribution
 				List<Distribution> act = stpg.getTrans().get(i);
 				originalTrans.add(act); // for restoring the original transitions later
 				stpg.getTrans().set(i,new LinkedList<Distribution>());
@@ -1754,29 +1764,34 @@ public class STPGModelChecker extends ProbModelChecker
 	        mainLog.println("sz."+t+": "+sizes[t]);
 	    }*/
 	    // Calculate upper bound
+	    double[] res = new double[stpg.getNumStates()];
 	    for (int i = 0; i < stpg.getNumStates(); i++){
-	        for (int t = 0; t < numSCCs; t++){
-	        	
-	    		BitSet scc = sccs.get(t);
-	        	if (scc.get(i)){
-	        		double recurrence = 1/(Math.pow(p[t],sizes[t]-1) * (1-q[t]));
-	        		/*double maxReward = 0;
-	        		for (Distribution d : stpg.getTrans().get(i)){
-	        			for (Integer s : d.getSupport()){
-	        				if (rew.getStateRewards().get(s) > maxReward)
-	        					maxReward = rew.getStateRewards().get(s);
-	        			}
-	        		}*/
-		    		//res += recurrence * maxReward;
-		    		res += recurrence * rew.getStateRewards().get(i);
-	        	}	    	
-		    }
+	    	double initValue = 0;
+	    	LinkedList<Integer> reachable = stpg.getReachableFrom(i);
+	    	for (Integer j : reachable){
+		        for (int t = 0; t < numSCCs; t++){
+		    		BitSet scc = sccs.get(t);
+		        	if (scc.get(j)){
+		        		double recurrence = 1/(Math.pow(p[t],sizes[t]-1) * (1-q[t]));
+		        		/*double maxReward = 0;
+		        		for (Distribution d : stpg.getTrans().get(i)){
+		        			for (Integer s : d.getSupport()){
+		        				if (rew.getStateRewards().get(s) > maxReward)
+		        					maxReward = rew.getStateRewards().get(s);
+		        			}
+		        		}*/
+			    		//res += recurrence * maxReward;
+			    		initValue += recurrence * rew.getStateRewards().get(j);
+		        	}	    	
+			    }
+			}
+			res[i] = initValue;
 	    }
 	    
 
 		//Restore original transitions
 		for (int i = 0; i < stpg.getNumStates(); i++){
-			if (stpg.stateOwners.get(i) == 1 && min1 || stpg.stateOwners.get(i) == 2 && min2)
+			if (stpg.stateOwners.get(i) == 2)
 				stpg.getTrans().set(i,originalTrans.removeFirst());
 		}
 

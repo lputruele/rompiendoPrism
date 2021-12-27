@@ -31,6 +31,7 @@ import java.util.BitSet;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
+import java.util.LinkedList;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
@@ -690,5 +691,120 @@ public class STPGExplicit extends MDPSimple implements STPG
 			    throw new PrismException("Game has a deadlock in state " + i +
 						     (statesList==null ? "" : ": " + statesList.get(i)));
 		}
+	}
+
+	// LP: Added method to get reachable states from a given state
+	public LinkedList<Integer> getReachableFrom(Integer s){
+		boolean[] visited = new boolean[this.getNumStates()];
+		LinkedList<Integer> toVisit = new LinkedList<Integer>(); 
+		LinkedList<Integer> res = new LinkedList<Integer>();
+		toVisit.add(s);
+		while (!toVisit.isEmpty()){
+			Integer current = toVisit.removeLast();
+			visited[current] = true;
+			for (Distribution d : this.getTrans().get(current)){
+				for (Integer succ : d.getSupport()){
+					if (!visited[succ]){
+						toVisit.add(succ);
+					}
+				}
+			}
+		}
+		for (int i = 0; i < this.getNumStates(); i++){
+			if (visited[i])
+				res.add(i);
+		}
+		return res;
+	}
+
+	// LP: Added method to check if model is stopping under fairness
+	public boolean stoppingUnderFairness(BitSet target){
+		LinkedList<Integer> t = new LinkedList<Integer>();
+		for (int i = 0; i < this.getNumStates(); i++){
+			if (target.get(i)){
+				t.add(i);
+			}
+		}
+		int oldSize = 0;
+		while (t.size() != oldSize){
+			oldSize = t.size();
+			for (Integer i : getPre(t,true)){
+				if (!t.contains(i))
+					t.add(i);
+			}
+		}
+
+		LinkedList<Integer> notT = new LinkedList<Integer>();
+		for (int i = 0; i < this.getNumStates(); i++){
+			if (!t.contains(i)){
+				notT.add(i);
+			}
+		}
+		oldSize = 0;
+		while (notT.size() != oldSize){
+			oldSize = notT.size();
+			for (Integer i : getPre(notT,false)){
+				if (!notT.contains(i))
+					notT.add(i);
+			}
+		}
+		return notT.isEmpty();
+	}
+
+	// LP: Added method to get predecessor states from a given set of states
+	private List<Integer> getPre(List<Integer> s, boolean forall){
+		LinkedList<Integer> res = new LinkedList<Integer>();
+		if (!forall){
+			for (int i=0;i<this.getNumStates();i++){
+				boolean addIt = false;
+				List<Distribution> act = this.getTrans().get(i);
+				for (int j=0;j<act.size() && !addIt;j++){
+					for (Integer succ : act.get(j).getSupport()){
+						if (s.contains(succ)){
+							res.add(i);
+							addIt = true;
+							break;
+						}
+					}
+				}
+			}
+		}
+		else{
+			for (int i=0;i<this.getNumStates();i++){
+				if (getStateOwners().get(i)==1){
+					boolean addIt = true;
+					List<Distribution> act = this.getTrans().get(i);
+					for (int j=0;j<act.size() && addIt;j++){
+						boolean atLeastOneSupport = false;
+						for (Integer succ : act.get(j).getSupport()){
+							if (s.contains(succ)){
+								atLeastOneSupport = true;
+								break;
+							}
+						}
+						if (!atLeastOneSupport){
+							addIt = false;
+							break;
+						}
+					}
+					if (addIt)
+						res.add(i);
+				}
+				else{
+					boolean addIt = false;
+					List<Distribution> act = this.getTrans().get(i);
+					for (int j=0;j<act.size() && !addIt;j++){
+						for (Integer succ : act.get(j).getSupport()){
+							if (s.contains(succ)){
+								res.add(i);
+								addIt = true;
+								break;
+							}
+						}
+					}
+				}
+			}
+		}
+		return res;
 	}
 }
